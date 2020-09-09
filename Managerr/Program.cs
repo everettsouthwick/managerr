@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using RadarrSharp;
 using System;
 using System.Collections.Generic;
@@ -67,9 +68,8 @@ namespace Managerr
             // We want to add all the movies the primary Radarr has to the secondary Radarr client.
             foreach (var movie in difference)
             {
-                movie.QualityProfileId = await GetQualityProfileId(secondary);
                 Console.WriteLine($"Adding {movie.Title} to secondary Radarr.");
-                await secondary.Movie.AddMovie(movie.Title, movie.Year, movie.QualityProfileId, movie.TitleSlug, movie.Images, Convert.ToInt32(movie.TmdbId), await GetRootFolderPath(secondary), movie.MinimumAvailability, movie.Monitored, new RadarrSharp.Endpoints.Movie.AddOptions { SearchForMovie = true });
+                await secondary.Movie.AddMovie(movie.Title, movie.Year, await GetQualityProfileId(secondary), movie.TitleSlug, movie.Images, Convert.ToInt32(movie.TmdbId), await GetRootFolderPath(secondary), movie.MinimumAvailability, movie.Monitored, new RadarrSharp.Endpoints.Movie.AddOptions { SearchForMovie = true });
             }
 
             // Next we want to find all the movies that the secondary Radarr has that the primary Radarr does not.
