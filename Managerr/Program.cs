@@ -1,5 +1,4 @@
-﻿using Managerr.Extensions;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using RadarrSharp;
 using System;
 using System.Collections.Generic;
