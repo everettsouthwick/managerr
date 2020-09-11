@@ -145,7 +145,7 @@ namespace Managerr.Services
                 var movie = secondaryMovies.SingleOrDefault(m => m.TmdbId == primaryMovie.TmdbId);
                 if (movie == null)
                 {
-                    difference.Add(movie);
+                    difference.Add(primaryMovie);
                 }
             }
 
