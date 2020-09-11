@@ -13,6 +13,7 @@ namespace Managerr.Services
     {
         public static RadarrClient BuildRadarrClient(IConfiguration config)
         {
+            Console.WriteLine($"Initializing new RadarrClient at http://{config.GetValue<string>("host")}:{config.GetValue<int>("port")}/?apiKey={config.GetValue<string>("apiKey")}");
             return new RadarrClient(config.GetValue<string>("host"), config.GetValue<int>("port"), config.GetValue<string>("apiKey"));
         }
 
@@ -25,7 +26,7 @@ namespace Managerr.Services
         public static async Task MonitorNewlyReleasedMovies(RadarrClient radarr)
         {
             var movies = await radarr.Movie.GetMovies();
-            var unmonitoredMovies = movies.Where(m => m.Monitored == false && m.Status == RadarrSharp.Enums.Status.Released);
+            var unmonitoredMovies = movies.Where(m => m.Monitored == false && m.Status == RadarrSharp.Enums.Status.Released && m.Year == DateTime.Now.Year);
             foreach (var movie in unmonitoredMovies)
             {
                 Console.WriteLine($"Monitoring {movie.Title} for being released recently.");
@@ -40,9 +41,17 @@ namespace Managerr.Services
             var unreleasedMovies = movies.Where(m => m.Monitored == true && m.Status != RadarrSharp.Enums.Status.Released);
             foreach (var movie in unreleasedMovies)
             {
-                Console.WriteLine($"Unmonitoring {movie.Title} for being unreleased.");
-                movie.Monitored = false;
-                await radarr.Movie.UpdateMovie(movie);
+                if (DateTime.Now.Year - movie.Year > 2)
+                {
+                    Console.WriteLine($"Unmonitoring {movie.Title} for being unreleased and old.");
+                    await radarr.Movie.DeleteMovie(movie.Id, true);
+                }
+                else
+                {
+                    Console.WriteLine($"Unmonitoring {movie.Title} for being unreleased.");
+                    movie.Monitored = false;
+                    await radarr.Movie.UpdateMovie(movie);
+                }
             }
         }
 
