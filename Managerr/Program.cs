@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Managerr.Services;
+using System.Threading;
 
 namespace Managerr
 {
@@ -24,13 +25,19 @@ namespace Managerr
             var primary = RadarrService.BuildRadarrClient(Configuration.GetSection("primaryRadarr"));
             var secondary = RadarrService.BuildRadarrClient(Configuration.GetSection("secondaryRadarr"));
 
-            await RadarrService.GetOldMissingMovies(primary);
-            //await RadarrService.NetImportSync(primary);
-            await RadarrService.MovieSync(primary, secondary);
-            await RadarrService.MissingMoviesSearch(primary);
-            await RadarrService.MissingMoviesSearch(secondary);
-            await RadarrService.CutOffUnmetMoviesSearch(primary);
-            await RadarrService.CutOffUnmetMoviesSearch(secondary);
+            new Timer(async c => await RadarrService.MonitorNewlyReleasedMovies(primary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            new Timer(async c => await RadarrService.MonitorNewlyReleasedMovies(secondary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            new Timer(async c => await RadarrService.UnmonitorUnreleasedMovies(primary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            new Timer(async c => await RadarrService.UnmonitorUnreleasedMovies(secondary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            new Timer(async c => await RadarrService.GetOldMissingMovies(primary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            new Timer(async c => await RadarrService.GetOldMissingMovies(secondary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            new Timer(async c => await RadarrService.MovieSync(primary, secondary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            new Timer(async c => await RadarrService.MissingMoviesSearch(primary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            new Timer(async c => await RadarrService.MissingMoviesSearch(secondary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            new Timer(async c => await RadarrService.CutOffUnmetMoviesSearch(primary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            new Timer(async c => await RadarrService.CutOffUnmetMoviesSearch(secondary), null, TimeSpan.Zero, TimeSpan.FromDays(1));
+
+            Console.ReadLine();
         }
     }
 }

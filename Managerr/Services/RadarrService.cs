@@ -22,6 +22,30 @@ namespace Managerr.Services
             await radarr.Command.CutOffUnmetMoviesSearch("monitored", "true");
         }
 
+        public static async Task MonitorNewlyReleasedMovies(RadarrClient radarr)
+        {
+            var movies = await radarr.Movie.GetMovies();
+            var unmonitoredMovies = movies.Where(m => m.Monitored == false && m.Status == RadarrSharp.Enums.Status.Released);
+            foreach (var movie in unmonitoredMovies)
+            {
+                Console.WriteLine($"Monitoring {movie.Title} for being released recently.");
+                movie.Monitored = true;
+                await radarr.Movie.UpdateMovie(movie);
+            }
+        }
+
+        public static async Task UnmonitorUnreleasedMovies(RadarrClient radarr)
+        {
+            var movies = await radarr.Movie.GetMovies();
+            var unreleasedMovies = movies.Where(m => m.Monitored == true && m.Status != RadarrSharp.Enums.Status.Released);
+            foreach (var movie in unreleasedMovies)
+            {
+                Console.WriteLine($"Unmonitoring {movie.Title} for being unreleased.");
+                movie.Monitored = false;
+                await radarr.Movie.UpdateMovie(movie);
+            }
+        }
+
         public static async Task GetOldMissingMovies(RadarrClient radarr)
         {
             var movies = await radarr.Movie.GetMovies();
@@ -66,7 +90,7 @@ namespace Managerr.Services
         public static async Task MissingMoviesSearch(RadarrClient radarr)
         {
             Console.WriteLine($"Searching for missing movies.");
-            await radarr.Command.MissingMoviesSearch("status", "released");
+            await radarr.Command.MissingMoviesSearch("monitored", "true");
         }
 
         public static async Task MovieSync(RadarrClient primary, RadarrClient secondary)
