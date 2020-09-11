@@ -154,7 +154,7 @@ namespace Managerr.Services
 
         private static async Task<int> GetQualityProfileId(RadarrClient radarr)
         {
-            return (await radarr.QualityDefinition.GetQualityDefinitions())[0].Id;
+            return (await radarr.Profile.GetProfiles())[0].Id;
         }
 
         private static async Task<string> GetRootFolderPath(RadarrClient radarr)
