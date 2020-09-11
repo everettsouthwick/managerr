@@ -38,12 +38,12 @@ namespace Managerr.Services
         public static async Task UnmonitorUnreleasedMovies(RadarrClient radarr)
         {
             var movies = await radarr.Movie.GetMovies();
-            var unreleasedMovies = movies.Where(m => m.Monitored == true && m.Status != RadarrSharp.Enums.Status.Released);
+            var unreleasedMovies = movies.Where(m => m.Monitored == true && m.Status != RadarrSharp.Enums.Status.Released && m.Downloaded == false);
             foreach (var movie in unreleasedMovies)
             {
                 if (DateTime.Now.Year - movie.Year > 2)
                 {
-                    Console.WriteLine($"Unmonitoring {movie.Title} for being unreleased and old.");
+                    Console.WriteLine($"Deleting {movie.Title} for being unreleased and old.");
                     await radarr.Movie.DeleteMovie(movie.Id, true);
                 }
                 else
