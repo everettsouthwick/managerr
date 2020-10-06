@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using RadarrSharp;
 using RadarrSharp.Models;
+using RadarrSharp.Enums;
 using System.Linq;
 
 namespace Managerr.Services
@@ -21,79 +22,6 @@ namespace Managerr.Services
         {
             Console.WriteLine($"Searching for cutoff unmet movies.");
             await radarr.Command.CutOffUnmetMoviesSearch("monitored", "true");
-        }
-
-        public static async Task MonitorNewlyReleasedMovies(RadarrClient radarr)
-        {
-            var movies = await radarr.Movie.GetMovies();
-            var unmonitoredMovies = movies.Where(m => m.Monitored == false && m.Status == RadarrSharp.Enums.Status.Released && m.Year == DateTime.Now.Year);
-            foreach (var movie in unmonitoredMovies)
-            {
-                Console.WriteLine($"Monitoring {movie.Title} for being released recently.");
-                movie.Monitored = true;
-                await radarr.Movie.UpdateMovie(movie);
-            }
-        }
-
-        public static async Task UnmonitorUnreleasedMovies(RadarrClient radarr)
-        {
-            var movies = await radarr.Movie.GetMovies();
-            var unreleasedMovies = movies.Where(m => m.Monitored == true && m.Status != RadarrSharp.Enums.Status.Released && m.Downloaded == false);
-            foreach (var movie in unreleasedMovies)
-            {
-                if (DateTime.Now.Year - movie.Year > 2)
-                {
-                    Console.WriteLine($"Deleting {movie.Title} for being unreleased and old.");
-                    await radarr.Movie.DeleteMovie(movie.Id, true);
-                }
-                else
-                {
-                    Console.WriteLine($"Unmonitoring {movie.Title} for being unreleased.");
-                    movie.Monitored = false;
-                    await radarr.Movie.UpdateMovie(movie);
-                }
-            }
-        }
-
-        public static async Task GetOldMissingMovies(RadarrClient radarr)
-        {
-            var movies = await radarr.Movie.GetMovies();
-            var oldMovies = movies.Where(m => m.Monitored == true && m.Downloaded == false && m.Status == RadarrSharp.Enums.Status.Released);
-            foreach (var movie in oldMovies)
-            {
-                // Log that this movie is available, but has yet to be downloaded.
-                await SQLService.AddOrUpdateMovie(movie);
-
-                // If this is past the 5th of the month, we want to unmonitor all the old movies.
-                if (DateTime.Now.Day > 5)
-                {
-                    var failCount = await SQLService.GetFailCount(movie);
-                    if (failCount >= 30)
-                    {
-                        Console.WriteLine($"Deleting {movie.Title} for failing more than 30 times.");
-                        await radarr.Movie.DeleteMovie(movie.Id, true);
-                    }
-                    else if (failCount >= 7)
-                    {
-                        Console.WriteLine($"Unmonitoring {movie.Title} for failing more than 7 times.");
-                        movie.Monitored = false;
-                        await radarr.Movie.UpdateMovie(movie);
-                    }
-                }
-            }
-
-            // If it is before the 5th of the month, we want to once again monitor all the new movies.
-            if (DateTime.Now.Day < 5)
-            {
-                oldMovies = movies.Where(m => m.Monitored == false && m.Downloaded == false && m.Status == RadarrSharp.Enums.Status.Released);
-                foreach (var movie in oldMovies)
-                {
-                    Console.WriteLine($"Monitoring all old movies.");
-                    movie.Monitored = true;
-                    movie.MinimumAvailability = RadarrSharp.Enums.MinimumAvailability.Released;
-                    await radarr.Movie.UpdateMovie(movie);
-                }
-            }
         }
 
         public static async Task MissingMoviesSearch(RadarrClient radarr)
@@ -136,6 +64,26 @@ namespace Managerr.Services
             await radarr.Command.NetImportSync();
         }
 
+        public static async Task UpdateMonitoredStatuses(RadarrClient radarr)
+        {
+            // Monitor all the movies that were recently released.
+            await MonitorNewlyReleasedMovies(radarr);
+
+            // Unmonitor all the movies that are unreleased.
+            await UnmonitorUnreleasedMovies(radarr);
+
+            // After the first 3 days of the month, we want to log the released movies that have yet to be downloaded, and unmonitor them if they have failed for too long.
+            if (DateTime.Now.Day > 3)
+            {
+                await UnmonitorExcessivelySearchedMovies(radarr);
+            }
+            // Otherwise, we want to monitor of the released movies that have not been downloaded.
+            else
+            {
+                await MonitorAllReleasedMovies(radarr);
+            }
+        }
+
         private static IList<Movie> CalculateDifference(IList<Movie> primaryMovies, IList<Movie> secondaryMovies)
         {
             var difference = new List<Movie>();
@@ -160,6 +108,76 @@ namespace Managerr.Services
         private static async Task<string> GetRootFolderPath(RadarrClient radarr)
         {
             return (await radarr.RootFolder.GetRootFolders())[0].Path;
+        }
+
+        private static async Task MonitorAllReleasedMovies(RadarrClient radarr)
+        {
+            Console.WriteLine("Monitoring all released movies that have yet to be downloaded.");
+
+            // Get a list of all movies that are unmonitored and released.
+            var movies = (await radarr.Movie.GetMovies()).Where(m => m.Monitored == false && m.Status == Status.Released);
+
+            foreach (var movie in movies)
+            {
+                Console.WriteLine($"Monitoring {movie.Title} for being unmonitored and released. This runs during the first 3 days of the month.");
+                movie.Monitored = true;
+                await radarr.Movie.UpdateMovie(movie);
+            }
+        }
+
+        private static async Task MonitorNewlyReleasedMovies(RadarrClient radarr)
+        {
+            Console.WriteLine("Monitoring newly released movies.");
+
+            // Get a list of all movies.
+            var movies = await radarr.Movie.GetMovies();
+
+            // Get a list of all paths that should be excluded.
+            var paths = await SQLService.GetAllExcludedMovies();
+
+            // Get all the unmonitored movies that are released and not in our list of excluded movies.
+            var unmonitoredMovies = movies.Where(m => m.Monitored == false && m.Status == RadarrSharp.Enums.Status.Released && !paths.Contains(m.Path));
+
+            foreach (var movie in unmonitoredMovies)
+            {
+                Console.WriteLine($"Monitoring {movie.Title} for being recently released.");
+                movie.Monitored = true;
+                await radarr.Movie.UpdateMovie(movie);
+            }
+        }
+
+        private static async Task UnmonitorExcessivelySearchedMovies(RadarrClient radarr)
+        {
+            Console.WriteLine("Unmonitoring excessively searched movies.");
+
+            // Get a list of all movies that are monitored, released, and not downloaded.
+            var movies = (await radarr.Movie.GetMovies()).Where(m => m.Monitored == true && m.Status == Status.Released && m.Downloaded == false);
+
+            foreach (var movie in movies)
+            {
+                // Log that this movie is available, but has to be downloaded.
+                await SQLService.AddOrUpdateMovie(movie);
+                Console.WriteLine($"Unmonitoring {movie.Title} for failing to be downloaded more than 30 or more times.");
+                movie.Monitored = false;
+                await radarr.Movie.UpdateMovie(movie);
+            }
+        }
+
+        private static async Task UnmonitorUnreleasedMovies(RadarrClient radarr)
+        {
+            Console.WriteLine("Unmonitoring unreleased movies.");
+
+            // Get a list of all movies.
+            var movies = await radarr.Movie.GetMovies();
+
+            // Get all the monitored movies that are unreleased and not downloaded.
+            var unreleasedMovies = movies.Where(m => m.Monitored == true && m.Status != Status.Released && m.Downloaded == false);
+            foreach (var movie in unreleasedMovies)
+            {
+                Console.WriteLine($"Unmonitoring {movie.Title} for being unreleased.");
+                movie.Monitored = false;
+                await radarr.Movie.UpdateMovie(movie);
+            }
         }
     }
 }
