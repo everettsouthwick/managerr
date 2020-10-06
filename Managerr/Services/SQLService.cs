@@ -9,32 +9,6 @@ namespace Managerr.Services
 {
     public static class SQLService
     {
-        public async static Task<List<string>> GetAllExcludedMovies()
-        {
-            using (var conn = new SqliteConnection("Data Source=main.db"))
-            {
-                var results = new List<string>();
-
-                await conn.OpenAsync();
-
-                var command = conn.CreateCommand();
-                command.CommandText =
-                    @"SELECT `Path`
-                    FROM `Movies`
-                    WHERE `FailCount` > $FailCount";
-                command.Parameters.AddWithValue("$FailCount", 30);
-
-                using (var reader = await command.ExecuteReaderAsync())
-                {
-                    while (await reader.ReadAsync())
-                    {
-                        results.Add(reader.GetString(0));
-                    }
-                }
-
-                return results;
-            }
-        }
         public async static Task AddOrUpdateMovie(Movie movie)
         {
             using (var conn = new SqliteConnection("Data Source=main.db"))
@@ -69,6 +43,33 @@ namespace Managerr.Services
 
                     await command.ExecuteNonQueryAsync();
                 }
+            }
+        }
+
+        public async static Task<List<string>> GetAllExcludedMovies()
+        {
+            using (var conn = new SqliteConnection("Data Source=main.db"))
+            {
+                var results = new List<string>();
+
+                await conn.OpenAsync();
+
+                var command = conn.CreateCommand();
+                command.CommandText =
+                    @"SELECT `Path`
+                    FROM `Movies`
+                    WHERE `FailCount` >= $FailCount";
+                command.Parameters.AddWithValue("$FailCount", 30);
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        results.Add(reader.GetString(0));
+                    }
+                }
+
+                return results;
             }
         }
 

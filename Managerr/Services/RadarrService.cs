@@ -153,13 +153,21 @@ namespace Managerr.Services
             // Get a list of all movies that are monitored, released, and not downloaded.
             var movies = (await radarr.Movie.GetMovies()).Where(m => m.Monitored == true && m.Status == Status.Released && m.Downloaded == false);
 
+            // Get a list of all movies that are excluded.
+            var excludedMovies = await SQLService.GetAllExcludedMovies();
+
             foreach (var movie in movies)
             {
                 // Log that this movie is available, but has to be downloaded.
                 await SQLService.AddOrUpdateMovie(movie);
-                Console.WriteLine($"Unmonitoring {movie.Title} for failing to be downloaded more than 30 or more times.");
-                movie.Monitored = false;
-                await radarr.Movie.UpdateMovie(movie);
+
+                // If this movie has already failed 30 or more times, unmonitor it.
+                if (excludedMovies.Contains(movie.Path))
+                {
+                    Console.WriteLine($"Unmonitoring {movie.Title} for failing to be downloaded more than 30 or more times.");
+                    movie.Monitored = false;
+                    await radarr.Movie.UpdateMovie(movie);
+                }
             }
         }
 
