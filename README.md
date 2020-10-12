@@ -12,8 +12,8 @@ managerr syncs content libraries of multiple Radarr and Sonarr instances, in add
 ## Getting Started
 
 1. Clone or download the project
-2. Install dependencies with `npm install` in the root directory
-3. Execute `node server`
+2. Edit the `appsettings.json` with your Radarr instance values
+3. Run the application
 
 ## Features
 
